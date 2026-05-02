@@ -1,0 +1,1737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Release Governance & ServiceNow Simulation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #080c10;
+      --surface:   #0d1318;
+      --panel:     #111820;
+      --border:    #1e2d3d;
+      --amber:     #f0a500;
+      --amber-dim: #a06e00;
+      --cyan:      #00d4ff;
+      --cyan-dim:  #006680;
+      --green:     #00e676;
+      --green-dim: #006633;
+      --red:       #ff3d57;
+      --red-dim:   #7a1020;
+      --text:      #c8d8e8;
+      --text-dim:  #5a7080;
+      --mono:      'Share Tech Mono', monospace;
+      --display:   'Barlow Condensed', sans-serif;
+      --body:      'Barlow', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* NOISE OVERLAY */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    /* ─── SCANLINES ─── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    /* ─── HEADER ─── */
+    header {
+      position: relative;
+      padding: 60px 40px 50px;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    header .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+    }
+
+    header .glow-orb {
+      position: absolute;
+      top: -80px; left: -80px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(240,165,0,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .header-inner {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 30px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border: 1px solid var(--amber-dim);
+      padding: 5px 12px;
+      margin-bottom: 20px;
+    }
+
+    .badge::before {
+      content: '';
+      width: 7px; height: 7px;
+      background: var(--amber);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    h1 {
+      font-family: var(--display);
+      font-size: clamp(36px, 6vw, 72px);
+      font-weight: 800;
+      line-height: 0.95;
+      letter-spacing: -0.01em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+
+    h1 span { color: var(--amber); }
+
+    .subtitle {
+      margin-top: 16px;
+      font-size: 15px;
+      color: var(--text-dim);
+      max-width: 600px;
+      font-weight: 300;
+      letter-spacing: 0.02em;
+    }
+
+    .header-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      text-align: right;
+    }
+
+    .stat-chip {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--cyan);
+      border: 1px solid var(--cyan-dim);
+      padding: 4px 10px;
+      letter-spacing: 0.1em;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 40px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav ul {
+      max-width: 1200px;
+      margin: 0 auto;
+      list-style: none;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+
+    nav ul li a {
+      display: block;
+      padding: 16px 22px;
+      font-family: var(--display);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+      white-space: nowrap;
+    }
+
+    nav ul li a:hover,
+    nav ul li a.active {
+      color: var(--amber);
+      border-bottom-color: var(--amber);
+    }
+
+    /* ─── MAIN ─── */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 50px 40px 80px;
+    }
+
+    section { margin-bottom: 70px; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .section-number {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      letter-spacing: 0.15em;
+    }
+
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    h2 {
+      font-family: var(--display);
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    h3 {
+      font-family: var(--display);
+      font-size: 18px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--cyan);
+      margin-bottom: 14px;
+    }
+
+    /* ─── PANELS / CARDS ─── */
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 24px 28px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .card:hover { border-color: var(--amber-dim); }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--amber);
+    }
+
+    .card.cyan::before  { background: var(--cyan); }
+    .card.green::before { background: var(--green); }
+    .card.red::before   { background: var(--red); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+    /* ─── KPI TILES ─── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 30px;
+    }
+
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .kpi.amber-kpi::after { background: var(--amber); }
+    .kpi.cyan-kpi::after  { background: var(--cyan); }
+    .kpi.green-kpi::after { background: var(--green); }
+    .kpi.red-kpi::after   { background: var(--red); }
+
+    .kpi-val {
+      font-family: var(--display);
+      font-size: 44px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .kpi.amber-kpi .kpi-val { color: var(--amber); }
+    .kpi.cyan-kpi  .kpi-val { color: var(--cyan); }
+    .kpi.green-kpi .kpi-val { color: var(--green); }
+    .kpi.red-kpi   .kpi-val { color: var(--red); }
+
+    .kpi-label {
+      margin-top: 8px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ─── RELEASE CALENDAR ─── */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+
+    .cal-day-header {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 6px 0;
+      letter-spacing: 0.1em;
+    }
+
+    .cal-day {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 6px;
+      min-height: 72px;
+      font-family: var(--mono);
+      font-size: 10px;
+      position: relative;
+      transition: border-color 0.2s;
+      cursor: pointer;
+    }
+
+    .cal-day:hover { border-color: var(--amber-dim); }
+
+    .cal-day.empty { opacity: 0.2; }
+
+    .cal-day .day-num {
+      font-size: 16px;
+      font-weight: bold;
+      font-family: var(--display);
+      color: var(--text-dim);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .cal-event {
+      display: block;
+      font-size: 9px;
+      padding: 2px 4px;
+      margin-bottom: 2px;
+      letter-spacing: 0.05em;
+      border-left: 2px solid;
+    }
+
+    .cal-event.release { background: rgba(240,165,0,0.1); border-color: var(--amber); color: var(--amber); }
+    .cal-event.cab     { background: rgba(0,212,255,0.08); border-color: var(--cyan); color: var(--cyan); }
+    .cal-event.hotfix  { background: rgba(255,61,87,0.1); border-color: var(--red); color: var(--red); }
+
+    .cal-day.has-release { border-color: var(--amber-dim); }
+
+    /* ─── CHECKLIST ─── */
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .check-icon {
+      width: 18px; height: 18px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-family: var(--mono);
+      border: 1px solid;
+      margin-top: 1px;
+    }
+
+    .check-icon.done  { border-color: var(--green); color: var(--green); }
+    .check-icon.pend  { border-color: var(--amber); color: var(--amber); }
+    .check-icon.block { border-color: var(--red);   color: var(--red); }
+
+    .checklist-item .item-text { flex: 1; }
+    .checklist-item .item-phase {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* ─── SERVICENOW TICKETS ─── */
+    .ticket {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .ticket-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .ticket-id {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--amber);
+      letter-spacing: 0.08em;
+    }
+
+    .ticket-body { padding: 18px; }
+
+    .ticket-title {
+      font-family: var(--display);
+      font-size: 16px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .ticket-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .meta-row {
+      font-size: 12px;
+    }
+
+    .meta-row .label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: block;
+    }
+
+    .meta-row .value {
+      color: var(--text);
+    }
+
+    .ticket-workflow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 14px;
+      overflow-x: auto;
+    }
+
+    .wf-step {
+      font-family: var(--mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .wf-step.done     { background: rgba(0,230,118,0.08); border-color: var(--green-dim); color: var(--green); }
+    .wf-step.active   { background: rgba(240,165,0,0.12); border-color: var(--amber); color: var(--amber); }
+    .wf-step.pending  { border-color: var(--border); color: var(--text-dim); }
+
+    .wf-arrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--border);
+      padding: 0 4px;
+    }
+
+    /* ─── STATUS BADGES ─── */
+    .status {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      padding: 3px 9px;
+      text-transform: uppercase;
+    }
+
+    .status.open       { background: rgba(0,212,255,0.1); color: var(--cyan); border: 1px solid var(--cyan-dim); }
+    .status.approved   { background: rgba(0,230,118,0.1); color: var(--green); border: 1px solid var(--green-dim); }
+    .status.in-progress{ background: rgba(240,165,0,0.1); color: var(--amber); border: 1px solid var(--amber-dim); }
+    .status.closed     { background: rgba(90,112,128,0.2); color: var(--text-dim); border: 1px solid var(--border); }
+    .status.critical   { background: rgba(255,61,87,0.1); color: var(--red); border: 1px solid var(--red-dim); }
+    .status.p1         { background: rgba(255,61,87,0.15); color: var(--red); border: 1px solid var(--red); }
+
+    /* ─── PRIORITY BADGE ─── */
+    .priority {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 7px;
+      letter-spacing: 0.08em;
+    }
+
+    .priority.p1 { color: var(--red); border: 1px solid var(--red-dim); }
+    .priority.p2 { color: var(--amber); border: 1px solid var(--amber-dim); }
+    .priority.p3 { color: var(--cyan); border: 1px solid var(--cyan-dim); }
+    .priority.p4 { color: var(--text-dim); border: 1px solid var(--border); }
+
+    /* ─── DASHBOARD BARS ─── */
+    .bar-chart { display: flex; flex-direction: column; gap: 14px; }
+
+    .bar-row { display: flex; flex-direction: column; gap: 5px; }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .bar-label .name { color: var(--text); }
+    .bar-label .val  { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+
+    .bar-track {
+      height: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      animation: growBar 1.2s cubic-bezier(0.4,0,0.2,1) both;
+    }
+
+    @keyframes growBar {
+      from { width: 0 !important; }
+    }
+
+    .bar-fill.amber { background: linear-gradient(90deg, var(--amber-dim), var(--amber)); }
+    .bar-fill.green { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
+    .bar-fill.cyan  { background: linear-gradient(90deg, var(--cyan-dim),  var(--cyan)); }
+    .bar-fill.red   { background: linear-gradient(90deg, var(--red-dim),   var(--red)); }
+
+    /* ─── TABLE ─── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead tr {
+      border-bottom: 1px solid var(--amber-dim);
+    }
+
+    th {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--amber);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 400;
+    }
+
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ─── CMDB ─── */
+    .cmdb-node {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      font-size: 12px;
+      text-align: center;
+      position: relative;
+    }
+
+    .cmdb-node .ci-name {
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      display: block;
+    }
+
+    .cmdb-node .ci-type {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .cmdb-node.tier1 { border-color: var(--amber-dim); }
+    .cmdb-node.tier2 { border-color: var(--cyan-dim); }
+    .cmdb-node.tier3 { border-color: var(--border); }
+
+    .cmdb-connector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      color: var(--border);
+      font-family: var(--mono);
+      font-size: 18px;
+    }
+
+    /* ─── SLA DIAL ─── */
+    .sla-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+    .sla-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 24px 20px;
+      text-align: center;
+    }
+
+    .sla-ring {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 14px;
+    }
+
+    .sla-ring svg { transform: rotate(-90deg); }
+
+    .sla-ring .ring-bg  { fill: none; stroke: var(--border); stroke-width: 8; }
+    .sla-ring .ring-val {
+      fill: none;
+      stroke-width: 8;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .sla-ring .ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--display);
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .sla-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .sla-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* ─── ROLLBACK PLAN ─── */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+
+    .timeline-item {
+      display: flex;
+      gap: 20px;
+      padding-bottom: 24px;
+      position: relative;
+    }
+
+    .timeline-item:last-child { padding-bottom: 0; }
+
+    .tl-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 40px;
+      flex-shrink: 0;
+    }
+
+    .tl-dot {
+      width: 12px; height: 12px;
+      border: 2px solid var(--amber);
+      background: var(--bg);
+      border-radius: 50%;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .tl-dot.green  { border-color: var(--green); }
+    .tl-dot.red    { border-color: var(--red); }
+    .tl-dot.cyan   { border-color: var(--cyan); }
+
+    .tl-line {
+      width: 1px;
+      flex: 1;
+      background: var(--border);
+      margin-top: 4px;
+    }
+
+    .tl-content {
+      flex: 1;
+      padding-top: 0;
+    }
+
+    .tl-time {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--amber);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .tl-title {
+      font-family: var(--display);
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .tl-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* ─── COMMS SECTION ─── */
+    .comm-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 18px 22px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .comm-icon {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .comm-body {}
+    .comm-title {
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .comm-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .comm-meta {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    /* ─── SIGNOFF ─── */
+    .signoff-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .signoff-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .signoff-avatar {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--display);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--amber);
+    }
+
+    .signoff-name {
+      font-family: var(--display);
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .signoff-role {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 3px 0 10px;
+    }
+
+    .signoff-sig {
+      font-family: 'Georgia', serif;
+      font-style: italic;
+      font-size: 17px;
+      color: var(--green);
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 30px 40px;
+      background: var(--surface);
+    }
+
+    footer .inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    footer p {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+    }
+
+    .footer-links { display: flex; gap: 20px; }
+
+    .footer-links a {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover { color: var(--amber); }
+
+    /* ─── ANIMATIONS ─── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-up:nth-child(1) { animation-delay: 0.05s; }
+    .fade-up:nth-child(2) { animation-delay: 0.15s; }
+    .fade-up:nth-child(3) { animation-delay: 0.25s; }
+    .fade-up:nth-child(4) { animation-delay: 0.35s; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      header { padding: 40px 20px 36px; }
+      main { padding: 36px 20px 60px; }
+      nav { padding: 0 20px; }
+      .grid-2, .grid-3, .grid-4, .kpi-grid, .sla-grid, .signoff-grid { grid-template-columns: 1fr 1fr; }
+      .calendar-grid { grid-template-columns: repeat(4, 1fr); }
+      .header-inner { grid-template-columns: 1fr; }
+      .header-stats { text-align: left; flex-direction: row; flex-wrap: wrap; }
+      footer .inner { flex-direction: column; gap: 12px; }
+    }
+
+    @media (max-width: 600px) {
+      .grid-2, .grid-3, .grid-4, .kpi-grid, .sla-grid, .signoff-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ───── HEADER ───── -->
+<header>
+  <div class="grid-bg"></div>
+  <div class="glow-orb"></div>
+  <div class="header-inner">
+    <div>
+      <div class="badge">Portfolio Project · ITSM &amp; Release Mgmt</div>
+      <h1>Release <span>Governance</span><br>&amp; ServiceNow<br>Simulation</h1>
+      <p class="subtitle">A full simulation of enterprise release governance including CAB approvals, ITSM workflows, CMDB tracking, SLA dashboards, and production-readiness reporting.</p>
+    </div>
+    <div class="header-stats">
+      <div class="stat-chip">CHG · INC · REQ WORKFLOWS</div>
+      <div class="stat-chip">CMDB · CI OWNERSHIP</div>
+      <div class="stat-chip">SLA COMPLIANCE DASHBOARD</div>
+      <div class="stat-chip">ROLLBACK &amp; COMMS PLAN</div>
+    </div>
+  </div>
+</header>
+
+<!-- ───── NAV ───── -->
+<nav>
+  <ul>
+    <li><a href="#overview" class="active">Overview</a></li>
+    <li><a href="#calendar">Release Calendar</a></li>
+    <li><a href="#servicenow">ServiceNow</a></li>
+    <li><a href="#dashboard">Dashboard</a></li>
+    <li><a href="#cmdb">CMDB</a></li>
+    <li><a href="#rollback">Rollback Plan</a></li>
+    <li><a href="#signoff">Signoff</a></li>
+  </ul>
+</nav>
+
+<!-- ───── MAIN ───── -->
+<main>
+
+  <!-- ── OVERVIEW ── -->
+  <section id="overview">
+    <div class="section-header">
+      <span class="section-number">// 01</span>
+      <h2>Project Overview</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi amber-kpi fade-up">
+        <div class="kpi-val">94%</div>
+        <div class="kpi-label">Release Success Rate</div>
+      </div>
+      <div class="kpi green-kpi fade-up">
+        <div class="kpi-val">98.2%</div>
+        <div class="kpi-label">SLA Compliance</div>
+      </div>
+      <div class="kpi cyan-kpi fade-up">
+        <div class="kpi-val">12</div>
+        <div class="kpi-label">Releases Simulated</div>
+      </div>
+      <div class="kpi red-kpi fade-up">
+        <div class="kpi-val">3</div>
+        <div class="kpi-label">P1 Incidents Resolved</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>What Was Built</h3>
+        <p style="color:var(--text-dim); font-size:13px; line-height:1.8;">
+          This project simulates a production-grade release governance process used by enterprise ITSM teams. It covers the full lifecycle from release planning through CAB approval, deployment, monitoring, and rollback — with ServiceNow-style ticket simulation for Change, Incident, and Request management.
+        </p>
+      </div>
+      <div class="card cyan">
+        <h3>Technologies &amp; Tools</h3>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px;">
+          <span class="status open">ServiceNow (Simulated)</span>
+          <span class="status approved">Excel Dashboard</span>
+          <span class="status in-progress">CMDB</span>
+          <span class="status open">CAB Process</span>
+          <span class="status approved">Release Mgmt</span>
+          <span class="status in-progress">ITSM Workflows</span>
+          <span class="status open">SLA Reporting</span>
+          <span class="status approved">CI/CD Gates</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── RELEASE CALENDAR ── -->
+  <section id="calendar">
+    <div class="section-header">
+      <span class="section-number">// 02</span>
+      <h2>Weekly Release Calendar</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:24px;">
+      <div class="card">
+        <h3>Month: January 2025</h3>
+        <div class="calendar-grid">
+          <div class="cal-day-header">MON</div>
+          <div class="cal-day-header">TUE</div>
+          <div class="cal-day-header">WED</div>
+          <div class="cal-day-header">THU</div>
+          <div class="cal-day-header">FRI</div>
+          <div class="cal-day-header">SAT</div>
+          <div class="cal-day-header">SUN</div>
+
+          <div class="cal-day empty"></div>
+          <div class="cal-day empty"></div>
+          <div class="cal-day"><span class="day-num">1</span></div>
+          <div class="cal-day"><span class="day-num">2</span><span class="cal-event cab">CAB Review</span></div>
+          <div class="cal-day"><span class="day-num">3</span></div>
+          <div class="cal-day"><span class="day-num">4</span></div>
+          <div class="cal-day"><span class="day-num">5</span></div>
+
+          <div class="cal-day has-release"><span class="day-num">6</span><span class="cal-event release">REL-001</span></div>
+          <div class="cal-day"><span class="day-num">7</span></div>
+          <div class="cal-day"><span class="day-num">8</span></div>
+          <div class="cal-day"><span class="day-num">9</span><span class="cal-event cab">CAB Review</span></div>
+          <div class="cal-day has-release"><span class="day-num">10</span><span class="cal-event release">REL-002</span></div>
+          <div class="cal-day"><span class="day-num">11</span></div>
+          <div class="cal-day"><span class="day-num">12</span></div>
+
+          <div class="cal-day"><span class="day-num">13</span></div>
+          <div class="cal-day"><span class="day-num">14</span><span class="cal-event hotfix">HOTFIX</span></div>
+          <div class="cal-day"><span class="day-num">15</span></div>
+          <div class="cal-day"><span class="day-num">16</span><span class="cal-event cab">CAB Review</span></div>
+          <div class="cal-day has-release"><span class="day-num">17</span><span class="cal-event release">REL-003</span></div>
+          <div class="cal-day"><span class="day-num">18</span></div>
+          <div class="cal-day"><span class="day-num">19</span></div>
+
+          <div class="cal-day has-release"><span class="day-num">20</span><span class="cal-event release">REL-004</span></div>
+          <div class="cal-day"><span class="day-num">21</span></div>
+          <div class="cal-day"><span class="day-num">22</span></div>
+          <div class="cal-day"><span class="day-num">23</span><span class="cal-event cab">CAB Review</span></div>
+          <div class="cal-day"><span class="day-num">24</span></div>
+          <div class="cal-day"><span class="day-num">25</span></div>
+          <div class="cal-day"><span class="day-num">26</span></div>
+
+          <div class="cal-day has-release"><span class="day-num">27</span><span class="cal-event release">REL-005</span></div>
+          <div class="cal-day"><span class="day-num">28</span></div>
+          <div class="cal-day"><span class="day-num">29</span></div>
+          <div class="cal-day"><span class="day-num">30</span><span class="cal-event cab">CAB Review</span></div>
+          <div class="cal-day has-release"><span class="day-num">31</span><span class="cal-event release">REL-006</span></div>
+          <div class="cal-day empty"></div>
+          <div class="cal-day empty"></div>
+        </div>
+        <div style="display:flex; gap:14px; margin-top:14px; flex-wrap:wrap;">
+          <span class="cal-event release" style="display:inline;">● Release Window</span>
+          <span class="cal-event cab" style="display:inline;">● CAB Review</span>
+          <span class="cal-event hotfix" style="display:inline;">● Hotfix</span>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card green">
+          <h3>Deployment Checklist</h3>
+          <div class="checklist">
+            <div class="checklist-item">
+              <div class="check-icon done">✓</div>
+              <div class="item-text">
+                Code freeze enforced &amp; feature flags verified
+                <div class="item-phase">Pre-Deployment</div>
+              </div>
+            </div>
+            <div class="checklist-item">
+              <div class="check-icon done">✓</div>
+              <div class="item-text">
+                All unit &amp; regression tests passing (100%)
+                <div class="item-phase">Testing Gate</div>
+              </div>
+            </div>
+            <div class="checklist-item">
+              <div class="check-icon done">✓</div>
+              <div class="item-text">
+                Change record approved by CAB
+                <div class="item-phase">CAB Approval</div>
+              </div>
+            </div>
+            <div class="checklist-item">
+              <div class="check-icon pend">~</div>
+              <div class="item-text">
+                Stakeholder notification sent (T-2h)
+                <div class="item-phase">Comms</div>
+              </div>
+            </div>
+            <div class="checklist-item">
+              <div class="check-icon pend">~</div>
+              <div class="item-text">
+                Deployment window open — on-call team confirmed
+                <div class="item-phase">Deployment</div>
+              </div>
+            </div>
+            <div class="checklist-item">
+              <div class="check-icon block">✕</div>
+              <div class="item-text">
+                Rollback script validated in staging
+                <div class="item-phase">Contingency — BLOCKED</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SERVICENOW ── -->
+  <section id="servicenow">
+    <div class="section-header">
+      <span class="section-number">// 03</span>
+      <h2>ServiceNow Workflow Simulation</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:18px;">
+
+      <!-- Change Ticket -->
+      <div class="ticket">
+        <div class="ticket-header">
+          <span class="ticket-id">CHG0012847</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="priority p2">P2</span>
+            <span class="status approved">Approved</span>
+          </div>
+        </div>
+        <div class="ticket-body">
+          <div class="ticket-title">Standard Change — Payment Gateway API v3.2 Upgrade</div>
+          <div class="ticket-meta">
+            <div class="meta-row"><span class="label">Requested By</span><span class="value">Sarah Mitchell</span></div>
+            <div class="meta-row"><span class="label">Assigned To</span><span class="value">Platform Engineering</span></div>
+            <div class="meta-row"><span class="label">Planned Start</span><span class="value">2025-01-17 02:00 UTC</span></div>
+            <div class="meta-row"><span class="label">Duration</span><span class="value">2 hours (02:00–04:00)</span></div>
+            <div class="meta-row"><span class="label">Change Type</span><span class="value">Standard</span></div>
+            <div class="meta-row"><span class="label">Risk Level</span><span class="value">Medium</span></div>
+          </div>
+          <p style="font-size:12px; color:var(--text-dim); margin-bottom:14px;">Upgrade payment gateway API from v3.1 to v3.2 to resolve CVE-2024-3891 security vulnerability. Zero-downtime deployment using blue/green strategy with automatic rollback if error rate exceeds 0.5%.</p>
+          <div class="ticket-workflow">
+            <div class="wf-step done">Submitted</div><div class="wf-arrow">→</div>
+            <div class="wf-step done">Risk Assessment</div><div class="wf-arrow">→</div>
+            <div class="wf-step done">CAB Review</div><div class="wf-arrow">→</div>
+            <div class="wf-step done">Approved</div><div class="wf-arrow">→</div>
+            <div class="wf-step active">Scheduled</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Deploy</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">PIR</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Closed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Incident Ticket -->
+      <div class="ticket">
+        <div class="ticket-header">
+          <span class="ticket-id">INC0043201</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="priority p1">P1</span>
+            <span class="status critical">Critical — Active</span>
+          </div>
+        </div>
+        <div class="ticket-body">
+          <div class="ticket-title">Production Outage — Checkout Service Unresponsive (503 Errors)</div>
+          <div class="ticket-meta">
+            <div class="meta-row"><span class="label">Detected</span><span class="value">2025-01-14 14:32 UTC</span></div>
+            <div class="meta-row"><span class="label">Assigned To</span><span class="value">DevOps On-Call · James Lee</span></div>
+            <div class="meta-row"><span class="label">Category</span><span class="value">Application / Service</span></div>
+            <div class="meta-row"><span class="label">Impact</span><span class="value">High — Revenue affecting</span></div>
+            <div class="meta-row"><span class="label">Affected CIs</span><span class="value">checkout-svc-prod, lb-prod-02</span></div>
+            <div class="meta-row"><span class="label">SLA Breach</span><span class="value">T+45min (Critical)</span></div>
+          </div>
+          <p style="font-size:12px; color:var(--text-dim); margin-bottom:14px;">Checkout service returning 503 for ~35% of requests. Root cause identified as memory leak in hotfix deployed at 14:15. Rollback initiated. War room bridge active — Bridge ID: #inc-43201.</p>
+          <div class="ticket-workflow">
+            <div class="wf-step done">Detected</div><div class="wf-arrow">→</div>
+            <div class="wf-step done">Triaged</div><div class="wf-arrow">→</div>
+            <div class="wf-step done">Assigned</div><div class="wf-arrow">→</div>
+            <div class="wf-step active">Investigating</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Resolving</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Resolved</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">PIR</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Closed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Request Ticket -->
+      <div class="ticket">
+        <div class="ticket-header">
+          <span class="ticket-id">REQ0009512</span>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="priority p3">P3</span>
+            <span class="status in-progress">In Progress</span>
+          </div>
+        </div>
+        <div class="ticket-body">
+          <div class="ticket-title">Service Request — New PROD Environment Access for QA Team Lead</div>
+          <div class="ticket-meta">
+            <div class="meta-row"><span class="label">Requested By</span><span class="value">Priya Nair (QA Lead)</span></div>
+            <div class="meta-row"><span class="label">Assigned Group</span><span class="value">Access Management</span></div>
+            <div class="meta-row"><span class="label">Submitted</span><span class="value">2025-01-15 09:20 UTC</span></div>
+            <div class="meta-row"><span class="label">SLA Target</span><span class="value">3 Business Days</span></div>
+            <div class="meta-row"><span class="label">Environment</span><span class="value">Production (Read-Only)</span></div>
+            <div class="meta-row"><span class="label">Manager Approval</span><span class="value">Vikram Sharma ✓</span></div>
+          </div>
+          <p style="font-size:12px; color:var(--text-dim); margin-bottom:14px;">Read-only production access required for post-release validation activities. Access scoped to application logs, deployment dashboards, and monitoring tools only. No write access requested.</p>
+          <div class="ticket-workflow">
+            <div class="wf-step done">Submitted</div><div class="wf-arrow">→</div>
+            <div class="wf-step done">Manager Approval</div><div class="wf-arrow">→</div>
+            <div class="wf-step active">Security Review</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Provisioning</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Notification</div><div class="wf-arrow">→</div>
+            <div class="wf-step pending">Closed</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── DASHBOARD ── -->
+  <section id="dashboard">
+    <div class="section-header">
+      <span class="section-number">// 04</span>
+      <h2>Excel Dashboard Metrics</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <h3>Release Success Rate</h3>
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">REL-001 · Auth Service</span><span class="val">100%</span></div>
+            <div class="bar-track"><div class="bar-fill green" style="width:100%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">REL-002 · Payment API</span><span class="val">100%</span></div>
+            <div class="bar-track"><div class="bar-fill green" style="width:100%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">REL-003 · Checkout Svc</span><span class="val">72%</span></div>
+            <div class="bar-track"><div class="bar-fill red" style="width:72%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">REL-004 · Notification</span><span class="val">100%</span></div>
+            <div class="bar-track"><div class="bar-fill green" style="width:100%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">REL-005 · Search Engine</span><span class="val">95%</span></div>
+            <div class="bar-track"><div class="bar-fill amber" style="width:95%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">REL-006 · Inventory</span><span class="val">100%</span></div>
+            <div class="bar-track"><div class="bar-fill green" style="width:100%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card cyan">
+        <h3>Incidents by Severity</h3>
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">P1 — Critical</span><span class="val">3</span></div>
+            <div class="bar-track"><div class="bar-fill red" style="width:30%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">P2 — High</span><span class="val">7</span></div>
+            <div class="bar-track"><div class="bar-fill amber" style="width:70%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">P3 — Medium</span><span class="val">14</span></div>
+            <div class="bar-track"><div class="bar-fill cyan" style="width:100%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">P4 — Low</span><span class="val">9</span></div>
+            <div class="bar-track"><div class="bar-fill amber" style="width:64%"></div></div>
+          </div>
+        </div>
+        <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+          <table>
+            <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Mean Time to Detect</td><td style="font-family:var(--mono); color:var(--cyan);">4.2 min</td></tr>
+              <tr><td>Mean Time to Resolve</td><td style="font-family:var(--mono); color:var(--cyan);">38.7 min</td></tr>
+              <tr><td>P1 Avg Resolution</td><td style="font-family:var(--mono); color:var(--red);">1h 12min</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Deployment Frequency</h3>
+        <div class="bar-chart">
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">Week 1</span><span class="val">2 deploys</span></div>
+            <div class="bar-track"><div class="bar-fill amber" style="width:40%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">Week 2</span><span class="val">3 deploys</span></div>
+            <div class="bar-track"><div class="bar-fill amber" style="width:60%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">Week 3</span><span class="val">4 deploys</span></div>
+            <div class="bar-track"><div class="bar-fill green" style="width:80%"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span class="name">Week 4</span><span class="val">5 deploys</span></div>
+            <div class="bar-track"><div class="bar-fill green" style="width:100%"></div></div>
+          </div>
+        </div>
+        <p style="font-size:11px; color:var(--text-dim); margin-top:14px; font-family:var(--mono);">Change Failure Rate: <span style="color:var(--green);">6.3%</span> &nbsp;·&nbsp; CAB Approval: <span style="color:var(--amber);">100%</span></p>
+      </div>
+    </div>
+
+    <!-- SLA Compliance -->
+    <div style="margin-top:24px;">
+      <h3 style="margin-bottom:18px;">SLA Compliance</h3>
+      <div class="sla-grid">
+        <div class="sla-card">
+          <div class="sla-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40"/>
+              <circle class="ring-val" cx="50" cy="50" r="40"
+                stroke="#00e676"
+                stroke-dasharray="251.2"
+                stroke-dashoffset="20"
+                style="animation: drawRing 1.5s ease forwards;"/>
+            </svg>
+            <div class="ring-text" style="color:var(--green);">98%</div>
+          </div>
+          <div class="sla-label">P1 Incident SLA</div>
+          <div class="sla-sub">Target: 1hr · Met: 2/3</div>
+        </div>
+        <div class="sla-card">
+          <div class="sla-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40"/>
+              <circle class="ring-val" cx="50" cy="50" r="40"
+                stroke="#f0a500"
+                stroke-dasharray="251.2"
+                stroke-dashoffset="5"
+                style="animation: drawRing 1.5s ease 0.2s forwards;"/>
+            </svg>
+            <div class="ring-text" style="color:var(--amber);">99%</div>
+          </div>
+          <div class="sla-label">Change SLA</div>
+          <div class="sla-sub">Target: 5BD · Met: 12/12</div>
+        </div>
+        <div class="sla-card">
+          <div class="sla-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="40"/>
+              <circle class="ring-val" cx="50" cy="50" r="40"
+                stroke="#00d4ff"
+                stroke-dasharray="251.2"
+                stroke-dashoffset="8"
+                style="animation: drawRing 1.5s ease 0.4s forwards;"/>
+            </svg>
+            <div class="ring-text" style="color:var(--cyan);">97%</div>
+          </div>
+          <div class="sla-label">Request SLA</div>
+          <div class="sla-sub">Target: 3BD · Met: 18/19</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CMDB ── -->
+  <section id="cmdb">
+    <div class="section-header">
+      <span class="section-number">// 05</span>
+      <h2>CMDB · CI Relationships</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card cyan">
+        <h3>Configuration Item Map</h3>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <!-- Tier 1 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div class="cmdb-node tier1"><span class="ci-name">checkout-svc-prod</span><span class="ci-type">Application · Tier 1</span></div>
+            <div class="cmdb-node tier1"><span class="ci-name">payment-api-prod</span><span class="ci-type">Application · Tier 1</span></div>
+          </div>
+          <div style="display:flex; gap:8px; justify-content:center; padding:2px 0; color:var(--border); font-family:var(--mono);">↕ depends on ↕</div>
+          <!-- Tier 2 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+            <div class="cmdb-node tier2"><span class="ci-name">db-postgres-prod</span><span class="ci-type">Database · Tier 2</span></div>
+            <div class="cmdb-node tier2"><span class="ci-name">redis-cache-prod</span><span class="ci-type">Cache · Tier 2</span></div>
+            <div class="cmdb-node tier2"><span class="ci-name">lb-prod-02</span><span class="ci-type">Load Balancer · Tier 2</span></div>
+          </div>
+          <div style="display:flex; gap:8px; justify-content:center; padding:2px 0; color:var(--border); font-family:var(--mono);">↕ hosted on ↕</div>
+          <!-- Tier 3 -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div class="cmdb-node tier3"><span class="ci-name">k8s-cluster-prod</span><span class="ci-type">Infrastructure · Tier 3</span></div>
+            <div class="cmdb-node tier3"><span class="ci-name">aws-vpc-prod</span><span class="ci-type">Network · Tier 3</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+          <h3>CI Ownership Register</h3>
+          <table>
+            <thead>
+              <tr><th>CI Name</th><th>Owner</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-family:var(--mono); font-size:12px;">checkout-svc-prod</td>
+                <td>Platform Eng</td>
+                <td><span class="status in-progress">Incident</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--mono); font-size:12px;">payment-api-prod</td>
+                <td>Payments Team</td>
+                <td><span class="status approved">Healthy</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--mono); font-size:12px;">db-postgres-prod</td>
+                <td>DBA Team</td>
+                <td><span class="status approved">Healthy</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--mono); font-size:12px;">redis-cache-prod</td>
+                <td>Infrastructure</td>
+                <td><span class="status approved">Healthy</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--mono); font-size:12px;">lb-prod-02</td>
+                <td>NetOps</td>
+                <td><span class="status approved">Healthy</span></td>
+              </tr>
+              <tr>
+                <td style="font-family:var(--mono); font-size:12px;">k8s-cluster-prod</td>
+                <td>DevOps</td>
+                <td><span class="status open">Patching</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card green">
+          <h3>Production Readiness</h3>
+          <div class="checklist">
+            <div class="checklist-item"><div class="check-icon done">✓</div><div class="item-text">All CIs have assigned owners <div class="item-phase">Ownership</div></div></div>
+            <div class="checklist-item"><div class="check-icon done">✓</div><div class="item-text">Relationships mapped in CMDB <div class="item-phase">Configuration Mgmt</div></div></div>
+            <div class="checklist-item"><div class="check-icon done">✓</div><div class="item-text">Monitoring alerts configured <div class="item-phase">Observability</div></div></div>
+            <div class="checklist-item"><div class="check-icon pend">~</div><div class="item-text">Disaster recovery tested <div class="item-phase">DR — Pending Q1</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── ROLLBACK PLAN ── -->
+  <section id="rollback">
+    <div class="section-header">
+      <span class="section-number">// 06</span>
+      <h2>Rollback Plan &amp; Stakeholder Comms</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card red">
+        <h3>Rollback Procedure — REL-003</h3>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="tl-left"><div class="tl-dot"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-time">T+0 · Trigger Condition</div>
+              <div class="tl-title">Error rate exceeds 1% threshold</div>
+              <div class="tl-desc">Automated monitoring alerts fire. On-call engineer paged via PagerDuty. War room bridge opened within 5 minutes.</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-left"><div class="tl-dot cyan"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-time">T+10min · Decision Point</div>
+              <div class="tl-title">Rollback decision by Release Manager</div>
+              <div class="tl-desc">Incident commander assesses impact. If not resolved in 10 minutes, rollback is authorized without CAB approval per emergency protocol.</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-left"><div class="tl-dot amber" style="border-color:var(--amber)"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-time">T+12min · Execution</div>
+              <div class="tl-title">Automated rollback script executed</div>
+              <div class="tl-desc">Blue/green switch flips traffic back to previous stable version. DNS TTL previously set to 30s for rapid propagation.</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-left"><div class="tl-dot green"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-time">T+20min · Validation</div>
+              <div class="tl-title">Health checks &amp; smoke tests pass</div>
+              <div class="tl-desc">Automated smoke test suite confirms baseline functionality restored. Error rate back below 0.1%.</div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="tl-left"><div class="tl-dot green"></div><div class="tl-line"></div></div>
+            <div class="tl-content">
+              <div class="tl-time">T+30min · Post-Incident</div>
+              <div class="tl-title">All-clear, PIR scheduled</div>
+              <div class="tl-desc">Stakeholders notified of resolution. Post-Incident Review (PIR) booked within 48 hours. Incident record updated in ServiceNow.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <h3>Stakeholder Communication</h3>
+        <div class="comm-card">
+          <div class="comm-icon">📢</div>
+          <div class="comm-body">
+            <div class="comm-title">Pre-Release Notice (T–48h)</div>
+            <div class="comm-sub">Sent to: All Stakeholders · Channel: Email + Slack #release-notices</div>
+            <div class="comm-meta">
+              <span class="status open">Scheduled</span>
+              <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim);">15 Jan · 09:00 UTC</span>
+            </div>
+          </div>
+        </div>
+        <div class="comm-card">
+          <div class="comm-icon">🟡</div>
+          <div class="comm-body">
+            <div class="comm-title">Deployment Start Alert (T–2h)</div>
+            <div class="comm-sub">Sent to: Tech Leads, Product Owners · Channel: PagerDuty + Slack</div>
+            <div class="comm-meta">
+              <span class="status in-progress">Sent</span>
+              <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim);">17 Jan · 00:00 UTC</span>
+            </div>
+          </div>
+        </div>
+        <div class="comm-card">
+          <div class="comm-icon">🔴</div>
+          <div class="comm-body">
+            <div class="comm-title">Incident Bridge Notification</div>
+            <div class="comm-sub">Sent to: CTO, Eng Leads, Customer Success · Channel: Emergency Bridge</div>
+            <div class="comm-meta">
+              <span class="status critical">Triggered</span>
+              <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim);">17 Jan · 02:27 UTC</span>
+            </div>
+          </div>
+        </div>
+        <div class="comm-card">
+          <div class="comm-icon">✅</div>
+          <div class="comm-body">
+            <div class="comm-title">Resolution &amp; All-Clear Comms</div>
+            <div class="comm-sub">Sent to: All Stakeholders · Channel: Email + Status Page Update</div>
+            <div class="comm-meta">
+              <span class="status approved">Sent</span>
+              <span style="font-family:var(--mono); font-size:10px; color:var(--text-dim);">17 Jan · 02:58 UTC</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SIGNOFF ── -->
+  <section id="signoff">
+    <div class="section-header">
+      <span class="section-number">// 07</span>
+      <h2>Release Signoff</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div style="margin-bottom:20px; padding:16px 22px; background:rgba(0,230,118,0.05); border:1px solid var(--green-dim); display:flex; align-items:center; gap:14px;">
+      <span style="font-size:22px;">✅</span>
+      <div>
+        <div style="font-family:var(--display); font-size:16px; font-weight:700; color:var(--green);">REL-003 · Release Approved &amp; Signed Off</div>
+        <div style="font-size:12px; color:var(--text-dim); font-family:var(--mono);">Signed: 2025-01-17 04:45 UTC &nbsp;·&nbsp; All gates passed &nbsp;·&nbsp; PIR completed</div>
+      </div>
+    </div>
+
+    <div class="signoff-grid">
+      <div class="signoff-card">
+        <div class="signoff-avatar">RM</div>
+        <div class="signoff-name">Rachel Morgan</div>
+        <div class="signoff-role">Release Manager</div>
+        <div class="signoff-sig">Rachel Morgan</div>
+      </div>
+      <div class="signoff-card">
+        <div class="signoff-avatar">JC</div>
+        <div class="signoff-name">James Chen</div>
+        <div class="signoff-role">CAB Chairperson</div>
+        <div class="signoff-sig">J. Chen</div>
+      </div>
+      <div class="signoff-card">
+        <div class="signoff-avatar">SA</div>
+        <div class="signoff-name">Sunita Agarwal</div>
+        <div class="signoff-role">QA Lead</div>
+        <div class="signoff-sig">S. Agarwal</div>
+      </div>
+      <div class="signoff-card">
+        <div class="signoff-avatar">TK</div>
+        <div class="signoff-name">Tom Keller</div>
+        <div class="signoff-role">Security Officer</div>
+        <div class="signoff-sig">T. Keller</div>
+      </div>
+      <div class="signoff-card">
+        <div class="signoff-avatar">DW</div>
+        <div class="signoff-name">Dana Walsh</div>
+        <div class="signoff-role">Product Owner</div>
+        <div class="signoff-sig">D. Walsh</div>
+      </div>
+      <div class="signoff-card">
+        <div class="signoff-avatar">LP</div>
+        <div class="signoff-name">Luis Perez</div>
+        <div class="signoff-role">DevOps Lead</div>
+        <div class="signoff-sig">L. Perez</div>
+      </div>
+    </div>
+
+    <!-- Skills Summary -->
+    <div style="margin-top:40px;" class="card cyan">
+      <h3>Skills Demonstrated</h3>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div>
+          <p style="font-size:13px; color:var(--text-dim); margin-bottom:12px; font-family:var(--mono);">// RELEASE MANAGEMENT</p>
+          <div style="display:flex; flex-wrap:wrap; gap:7px;">
+            <span class="status open">Weekly Release Calendar</span>
+            <span class="status open">Deployment Checklist</span>
+            <span class="status open">CAB Approval Process</span>
+            <span class="status open">Rollback Planning</span>
+            <span class="status open">Stakeholder Comms</span>
+            <span class="status open">Release Signoff</span>
+          </div>
+        </div>
+        <div>
+          <p style="font-size:13px; color:var(--text-dim); margin-bottom:12px; font-family:var(--mono);">// ITSM &amp; OPERATIONS</p>
+          <div style="display:flex; flex-wrap:wrap; gap:7px;">
+            <span class="status approved">ServiceNow CHG</span>
+            <span class="status approved">ServiceNow INC</span>
+            <span class="status approved">ServiceNow REQ</span>
+            <span class="status approved">CMDB Management</span>
+            <span class="status approved">CI Ownership</span>
+            <span class="status approved">SLA Compliance</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ───── FOOTER ───── -->
+<footer>
+  <div class="inner">
+    <p>© 2025 · Release Governance &amp; ServiceNow Simulation Project · Portfolio Work</p>
+    <div class="footer-links">
+      <a href="#overview">Overview</a>
+      <a href="#calendar">Calendar</a>
+      <a href="#servicenow">ServiceNow</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#cmdb">CMDB</a>
+      <a href="https://github.com" target="_blank">GitHub ↗</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ── NAV ACTIVE STATE ON SCROLL ──
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav ul li a');
+
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 100) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === `#${current}`);
+    });
+  });
+
+  // ── ANIMATE BARS ON SCROLL ──
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.querySelectorAll('.bar-fill').forEach((b, i) => {
+          b.style.animationDelay = `${i * 0.1}s`;
+        });
+      }
+    });
+  }, { threshold: 0.2 });
+
+  document.querySelectorAll('.bar-chart').forEach(el => observer.observe(el));
+
+  // ── KPI COUNTER ANIMATION ──
+  document.querySelectorAll('.kpi-val').forEach(el => {
+    const text = el.textContent.trim();
+    const num = parseFloat(text);
+    if (isNaN(num)) return;
+    const suffix = text.replace(String(num), '');
+    let start = 0;
+    const step = num / 40;
+    const interval = setInterval(() => {
+      start = Math.min(start + step, num);
+      el.textContent = (Number.isInteger(num) ? Math.round(start) : start.toFixed(1)) + suffix;
+      if (start >= num) clearInterval(interval);
+    }, 30);
+  });
+</script>
+
+</body>
+</html>
