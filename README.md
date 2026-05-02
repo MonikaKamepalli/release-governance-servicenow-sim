@@ -1,4 +1,4 @@
-# 🚀 [Release Governance & ServiceNow Simulation](https://htmlpreview.github.io/?https://github.com/MonikaKamepalli/release-governance-servicenow-sim/edit/main/index.html)
+# 🚀 [Release Governance & ServiceNow Simulation](https://htmlpreview.github.io/?https://github.com/MonikaKamepalli/release-governance-servicenow-sim/main/index.html)
 
 > A self-built project simulating enterprise-grade release management, ITSM workflows, and operational reporting — built to understand how production software is safely planned, approved, deployed, and recovered.
 
